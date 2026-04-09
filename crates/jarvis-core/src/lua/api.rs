@@ -1,4 +1,5 @@
 pub mod core;
+pub mod speak;
 pub mod audio;
 pub mod context;
 pub mod http;

@@ -37,11 +37,9 @@ pub fn register(lua: &Lua, jarvis: &Table) -> mlua::Result<()> {
     })?;
     jarvis.set("sleep", sleep_fn)?;
     
-    // @ jarvis.speak(text)
-    // @TODO: update when TTS will be implemented
+    // @ jarvis.speak(text) — озвучка через SAPI (Windows), `say` (macOS), spd-say/espeak (Linux)
     let speak_fn = lua.create_function(|_, text: String| {
-        log::info!("[Lua] SPEAK: {}", text);
-        // pass
+        super::speak::speak_text(&text);
         Ok(())
     })?;
     jarvis.set("speak", speak_fn)?;

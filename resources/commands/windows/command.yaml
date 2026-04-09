@@ -1,8 +1,13 @@
 list:
 - command:
-    action: ahk
-    exe_path: ahk/Roll up windows.exe
-    exe_args:
+    action: cli
+    cli_cmd: powershell
+    cli_args:
+    - -NoProfile
+    - -WindowStyle
+    - Hidden
+    - -Command
+    - (New-Object -ComObject Shell.Application).MinimizeAll()
   voice:
     sounds:
     - ok1

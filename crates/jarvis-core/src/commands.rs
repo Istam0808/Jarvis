@@ -114,6 +114,107 @@ pub fn commands_hash(commands: &[JCommandsList]) -> String {
 }
 
 
+const RU_NUM_WORDS: &[&str] = &[
+    "ноль", "один", "одна", "два", "две", "три", "четыре", "пять", "шесть", "семь", "восемь",
+    "девять", "десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать", "пятнадцать",
+    "шестнадцать", "семнадцать", "восемнадцать", "девятнадцать", "двадцать", "тридцать", "сорок",
+    "пятьдесят", "шестьдесят", "семьдесят", "восемьдесят", "девяносто", "сто", "двести", "триста",
+    "четыреста", "тысяча", "тысячи", "тысяч",
+];
+
+const EN_NUM_WORDS: &[&str] = &[
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven",
+    "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+    "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety", "hundred",
+];
+
+fn token_is_number_like(word: &str, lang: &str) -> bool {
+    let w = word.trim_matches(|c: char| !(c.is_alphanumeric() || c == '-'));
+    if w.is_empty() {
+        return false;
+    }
+    if w.chars().all(|c| c.is_ascii_digit()) {
+        return true;
+    }
+    let w = w.to_lowercase();
+    match lang {
+        "ru" => RU_NUM_WORDS.iter().any(|&x| x == w.as_str()),
+        "en" => EN_NUM_WORDS.iter().any(|&x| x == w.as_str()),
+        _ => {
+            RU_NUM_WORDS.iter().any(|&x| x == w.as_str())
+                || EN_NUM_WORDS.iter().any(|&x| x == w.as_str())
+        }
+    }
+}
+
+fn looks_like_mental_math(phrase: &str, lang: &str) -> bool {
+    let has_digit = phrase.chars().any(|c| c.is_ascii_digit());
+    let has_ascii_expr = has_digit
+        && (phrase.contains('+')
+            || phrase.contains('*')
+            || phrase.contains('/')
+            || phrase.contains('×')
+            || phrase.contains('÷'));
+
+    let has_op_ru = phrase.contains("плюс")
+        || phrase.contains("минус")
+        || phrase.contains("умнож")
+        || (phrase.contains("раздели") && phrase.contains(" на"))
+        || (phrase.contains("подели") && phrase.contains(" на"));
+
+    let has_op_en = phrase.contains("plus")
+        || phrase.contains("minus")
+        || phrase.contains("times")
+        || phrase.contains("multiplied")
+        || phrase.contains("divide")
+        || phrase.contains("divided")
+        || phrase.contains(" over ");
+
+    let has_op = match lang {
+        "ru" => has_op_ru,
+        "en" => has_op_en,
+        _ => has_op_ru || has_op_en,
+    };
+
+    if !has_op && !has_ascii_expr {
+        return false;
+    }
+
+    if has_ascii_expr {
+        return true;
+    }
+
+    let words: Vec<&str> = phrase.split_whitespace().collect();
+    let mut count = 0u32;
+    for w in &words {
+        if token_is_number_like(w, lang) {
+            count += 1;
+        }
+    }
+
+    // Нужно минимум два числа (устный пример), иначе ложные срабатывания вроде «температура плюс 5».
+    count >= 2
+}
+
+fn try_fetch_mental_math<'a>(
+    phrase: &str,
+    lang: &str,
+    commands: &'a [JCommandsList],
+) -> Option<(&'a PathBuf, &'a JCommand)> {
+    if !looks_like_mental_math(phrase, lang) {
+        return None;
+    }
+    for cmd_list in commands {
+        for cmd in &cmd_list.commands {
+            if cmd.id == "mental_math" {
+                return Some((&cmd_list.path, cmd));
+            }
+        }
+    }
+    warn!("mental_math heuristic matched phrase {:?} but command id mental_math is missing", phrase);
+    None
+}
+
 pub fn fetch_command<'a>(
     phrase: &str,
     commands: &'a [JCommandsList],
@@ -123,6 +224,15 @@ pub fn fetch_command<'a>(
     let phrase = phrase.trim().to_lowercase();
     if phrase.is_empty() {
         return None;
+    }
+
+    if let Some(m) = try_fetch_mental_math(&phrase, lang.as_str(), commands) {
+        info!(
+            "Mental math heuristic: '{}' -> cmd '{}'",
+            phrase,
+            m.1.id
+        );
+        return Some(m);
     }
 
     let phrase_chars: Vec<char> = phrase.chars().collect();
@@ -214,10 +324,83 @@ pub fn execute_cli(cmd: &str, args: &[String]) -> std::io::Result<Child> {
     debug!("Spawning: cmd /C {} {:?}", cmd, args);
 
     if cfg!(target_os = "windows") {
-        Command::new("cmd").arg("/C").arg(cmd).args(args).spawn()
+        // Some launch contexts (e.g. GUI/tauri) may not have PATH configured for `cmd`.
+        // Prefer ComSpec, then fallback to system cmd.exe.
+        let mut candidates: Vec<String> = Vec::new();
+        if let Ok(comspec) = std::env::var("ComSpec") {
+            let comspec = comspec.trim().trim_matches('"').to_string();
+            if !comspec.is_empty() {
+                candidates.push(comspec);
+            }
+        }
+        candidates.push("cmd".to_string());
+        if let Ok(system_root) = std::env::var("SystemRoot") {
+            let root = system_root.trim().trim_matches('"');
+            if !root.is_empty() {
+                candidates.push(format!(r"{}\System32\cmd.exe", root));
+                // Needed when a 32-bit process runs on 64-bit Windows and wants native system32.
+                candidates.push(format!(r"{}\Sysnative\cmd.exe", root));
+            }
+        } else {
+            candidates.push(r"C:\Windows\System32\cmd.exe".to_string());
+            candidates.push(r"C:\Windows\Sysnative\cmd.exe".to_string());
+        }
+
+        let mut last_err: Option<std::io::Error> = None;
+        let mut failed_shells: Vec<String> = Vec::new();
+        for shell in candidates {
+            match Command::new(&shell).arg("/C").arg(cmd).args(args).spawn() {
+                Ok(child) => return Ok(child),
+                Err(e) => {
+                    failed_shells.push(format!("{} ({})", shell, e));
+                    last_err = Some(e);
+                }
+            }
+        }
+
+        let details = if failed_shells.is_empty() {
+            "no shell candidates".to_string()
+        } else {
+            failed_shells.join("; ")
+        };
+        Err(last_err.unwrap_or_else(|| std::io::Error::other(format!(
+            "Failed to spawn cmd shell: {}",
+            details
+        ))))
     } else {
         Command::new("sh").arg("-c").arg(cmd).args(args).spawn()
     }
+}
+
+fn resolve_ahk_exec_path(cmd_path: &Path, configured_path: &str) -> Result<PathBuf, String> {
+    let configured = Path::new(configured_path);
+    let local = cmd_path.join(configured_path);
+
+    if configured.exists() {
+        return Ok(configured.to_path_buf());
+    }
+    if local.exists() {
+        return Ok(local);
+    }
+
+    // Legacy packs point to *.exe, but resources currently ship *.ahk scripts.
+    if configured_path.to_ascii_lowercase().ends_with(".exe") {
+        let script_rel = configured_path[..configured_path.len() - 4].to_string() + ".ahk";
+        let script_abs = Path::new(&script_rel);
+        let script_local = cmd_path.join(&script_rel);
+
+        if script_abs.exists() {
+            return Ok(script_abs.to_path_buf());
+        }
+        if script_local.exists() {
+            return Ok(script_local);
+        }
+    }
+
+    Err(format!(
+        "AHK target not found: '{}' (checked absolute/local and .ahk fallback)",
+        configured_path
+    ))
 }
 
 pub fn execute_command(
@@ -241,20 +424,32 @@ pub fn execute_command(
         }
 
         // AutoHotkey command
-        // @TODO: Consider adding ahk source files execution?
         "ahk" => {
-            let exe_path_absolute = Path::new(&cmd_config.exe_path);
-            let exe_path_local = cmd_path.join(&cmd_config.exe_path);
+            let ahk_path = resolve_ahk_exec_path(cmd_path.as_path(), &cmd_config.exe_path)?;
+            let ahk_path_str = ahk_path.to_string_lossy().to_string();
+            let is_ahk_script = ahk_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.eq_ignore_ascii_case("ahk"))
+                .unwrap_or(false);
 
-            let exe_path = if exe_path_absolute.exists() {
-                exe_path_absolute
+            if is_ahk_script && cfg!(target_os = "windows") {
+                // `.ahk` is a script, not an executable binary.
+                // On Windows run it via `cmd /C` so file association can resolve AutoHotkey.
+                let mut cmdline = format!("\"{}\"", ahk_path_str);
+                for arg in &cmd_config.exe_args {
+                    cmdline.push(' ');
+                    cmdline.push_str(arg);
+                }
+
+                execute_cli(&cmdline, &[])
+                    .map(|_| true)
+                    .map_err(|e| format!("AHK process spawn error: {}", e))
             } else {
-                exe_path_local.as_path()
-            };
-
-            execute_exe(exe_path.to_str().unwrap(), &cmd_config.exe_args)
-                .map(|_| true)
-                .map_err(|e| format!("AHK process spawn error: {}", e))
+                execute_exe(&ahk_path_str, &cmd_config.exe_args)
+                    .map(|_| true)
+                    .map_err(|e| format!("AHK process spawn error: {}", e))
+            }
         }
         
         // CLI command type

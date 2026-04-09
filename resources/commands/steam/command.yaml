@@ -1,12 +1,21 @@
+# Без AutoHotkey: открытие Big Picture и закрытие Steam через PowerShell (нужен установленный Steam).
 list:
 - command:
-    action: ahk
-    exe_path: ahk/Open steam.exe
+    action: cli
+    cli_cmd: powershell
+    cli_args:
+    - -NoProfile
+    - -WindowStyle
+    - Hidden
+    - -Command
+    - "Start-Process 'steam://open/bigpicture'"
   voice:
     sounds:
     - game_mode
   phrases:
   - включи игровой режим
+  - запусти игровой режим
+  - запустить игровой режим
   - перейди в игровой режим
   - я хочу поиграть
   - включи стим
@@ -14,8 +23,14 @@ list:
   - открой стим
 
 - command:
-    action: ahk
-    exe_path: ahk/Close steam.exe
+    action: cli
+    cli_cmd: powershell
+    cli_args:
+    - -NoProfile
+    - -WindowStyle
+    - Hidden
+    - -Command
+    - "Get-Process steam -ErrorAction SilentlyContinue | Stop-Process -Force"
   voice:
     sounds:
     - ok1

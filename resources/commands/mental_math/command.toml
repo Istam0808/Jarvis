@@ -1,0 +1,20 @@
+[[commands]]
+id = "mental_math"
+type = "lua"
+script = "script.lua"
+timeout = 5000
+sandbox = "standard"
+
+# Подсказки для intent/эмбеддингов; основной вход — эвристика в fetch_command
+[commands.phrases]
+ru = [
+    "пять плюс пять",
+    "сколько будет",
+    "посчитай",
+    "сколько будет пять плюс пять",
+]
+en = [
+    "five plus five",
+    "what is",
+    "calculate",
+]
