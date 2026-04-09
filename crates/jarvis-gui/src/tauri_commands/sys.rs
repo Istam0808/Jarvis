@@ -2,8 +2,6 @@ use sysinfo::{System, Pid, ProcessRefreshKind, RefreshKind, CpuRefreshKind, Comp
 use peak_alloc::PeakAlloc;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
-use std::process::Command;
-use std::env;
 
 #[global_allocator]
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;

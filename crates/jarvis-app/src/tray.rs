@@ -7,10 +7,7 @@ use tray_icon::{
 use image;
 use std::process::Command;
 
-#[cfg(target_os="windows")]
-use winit::platform::windows::EventLoopBuilderExtWindows;
-
-use jarvis_core::{config, i18n, voices, ipc::{self, IpcEvent}, SettingsManager};
+use jarvis_core::{i18n, voices, ipc::{self, IpcEvent}, SettingsManager};
 
 const TRAY_ICON_BYTES: &[u8] = include_bytes!("../../../resources/icons/32x32.png");
 
@@ -56,6 +53,7 @@ pub fn init_blocking(settings: SettingsManager) {
 
     #[cfg(target_os = "windows")]
     {
+        info!("Tray: Windows message loop starting.");
         loop {
             if let Ok(event) = menu_channel.try_recv() {
                 handle_menu_event(&event, &settings, &tray_state);
@@ -77,8 +75,6 @@ pub fn init_blocking(settings: SettingsManager) {
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
     }
-
-    info!("Tray initialized.");
 }
 
 fn handle_menu_event(event: &MenuEvent, settings: &SettingsManager, tray_state: &menu::TrayState) {

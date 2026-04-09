@@ -1,9 +1,19 @@
 use once_cell::sync::OnceCell;
 use pv_recorder::{PvRecorder, PvRecorderBuilder};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 static RECORDER: OnceCell<PvRecorder> = OnceCell::new();
 static IS_RECORDING: AtomicBool = AtomicBool::new(false);
+/// Throttle log spam when read() fails in a tight loop (e.g. INVALID_STATE).
+static LAST_READ_ERR_LOG_MS: AtomicU64 = AtomicU64::new(0);
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
 
 pub fn init_microphone(device_index: i32, frame_length: u32) -> bool {
     if RECORDER.get().is_some() {
@@ -45,8 +55,18 @@ pub fn read_microphone(frame_buffer: &mut [i16]) {
                 frame_buffer.copy_from_slice(f.as_slice());
             }
             Err(msg) => {
-                // @TODO: Fix? PvRecorder always wait for PCM buffer size of 512.
-                error!("Failed to read audio frame. {:?}", msg);
+                // Не оставляем старый кадр — иначе VAD/wake видят «левый» сигнал.
+                frame_buffer.fill(0);
+                let t = now_ms();
+                let last = LAST_READ_ERR_LOG_MS.load(Ordering::Relaxed);
+                if t.saturating_sub(last) >= 1000 {
+                    LAST_READ_ERR_LOG_MS.store(t, Ordering::Relaxed);
+                    error!(
+                        "Failed to read audio frame ({:?}). \
+                        INVALID_STATE обычно значит: запись остановлена или сбой устройства — перезапустите ассистент, проверьте микрофон и что другой процесс не захватил его эксклюзивно.",
+                        msg
+                    );
+                }
             }
         }
     }

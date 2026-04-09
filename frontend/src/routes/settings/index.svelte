@@ -107,13 +107,19 @@
                 invoke("db_write", { key: "assistant_voice", val: voiceVal }),
                 invoke("db_write", { key: "selected_microphone", val: selectedMicrophone }),
                 invoke("db_write", { key: "selected_wake_word_engine", val: selectedWakeWordEngine }),
-                invoke("db_write", { key: "selected_intent_recognition_engine", val: selectedIntentRecognitionEngine }),
-                invoke("db_write", { key: "selected_slot_extraction_engine", val: selectedSlotExtractionEngine }),
+                invoke("db_write", { key: "intent_backend", val: selectedIntentRecognitionEngine }),
+                invoke("db_write", {
+                    key: "slots_backend",
+                    val:
+                        selectedSlotExtractionEngine === "none" || !selectedGlinerModel
+                            ? "none"
+                            : selectedGlinerModel,
+                }),
                 invoke("db_write", { key: "selected_gliner_model", val: selectedGlinerModel }),
                 invoke("db_write", { key: "selected_vosk_model", val: selectedVoskModel }),
 
                 invoke("db_write", { key: "noise_suppression", val: selectedNoiseSuppression }),
-                invoke("db_write", { key: "vad", val: selectedVad }),
+                invoke("db_write", { key: "vad_backend", val: selectedVad }),
                 invoke("db_write", { key: "gain_normalizer", val: gainNormalizerEnabled.toString() }),
 
                 invoke("db_write", { key: "api_key__picovoice", val: apiKeyPicovoice }),
@@ -191,13 +197,13 @@
                    pico, openai] = await Promise.all([
                 invoke<string>("db_read", { key: "selected_microphone" }),
                 invoke<string>("db_read", { key: "selected_wake_word_engine" }),
-                invoke<string>("db_read", { key: "selected_intent_recognition_engine" }),
-                invoke<string>("db_read", { key: "selected_slot_extraction_engine" }),
+                invoke<string>("db_read", { key: "intent_backend" }),
+                invoke<string>("db_read", { key: "slots_backend" }),
                 invoke<string>("db_read", { key: "selected_gliner_model" }),
                 invoke<string>("db_read", { key: "selected_vosk_model" }),
 
                 invoke<string>("db_read", { key: "noise_suppression" }),
-                invoke<string>("db_read", { key: "vad" }),
+                invoke<string>("db_read", { key: "vad_backend" }),
                 invoke<string>("db_read", { key: "gain_normalizer" }),
 
                 invoke<string>("db_read", { key: "api_key__picovoice" }),
@@ -207,11 +213,14 @@
             selectedMicrophone = mic
             selectedWakeWordEngine = wakeWord
             selectedIntentRecognitionEngine = intentReco
-            selectedSlotExtractionEngine = slotEngine
+            selectedSlotExtractionEngine = slotEngine === "none" ? "none" : "gliner"
+            selectedGlinerModel = slotEngine === "none" ? glinerModel : slotEngine
             selectedVoskModel = voskModel
-            selectedGlinerModel = glinerModel
-            selectedNoiseSuppression = noiseSuppression
-            selectedVad = vad
+            const ns = noiseSuppression.toLowerCase()
+            selectedNoiseSuppression = ns === "nnnoiseless" ? "nnnoiseless" : "none"
+            const vadNorm = vad.toLowerCase()
+            selectedVad =
+                vadNorm === "none" ? "none" : vadNorm === "nnnoiseless" ? "nnnoiseless" : "energy"
             gainNormalizerEnabled = gainNormalizer === "true"
             apiKeyPicovoice = pico
             apiKeyOpenai = openai
@@ -374,7 +383,7 @@
         <Space h="xl" />
         <NativeSelect
             data={[
-                { label: "Intent Classifier", value: "IntentClassifier" },
+                { label: "Intent Classifier", value: "intent-classifier" },
                 { label: "Embedding Classifier", value: "EmbeddingClassifier" }
             ]}
             label={t('settings-intent-engine')}
@@ -386,8 +395,8 @@
         <Space h="xl" />
         <NativeSelect
             data={[
-                { label: t('settings-disabled'), value: "None" },
-                { label: "GLiNER (NER)", value: "GLiNER" }
+                { label: t('settings-disabled'), value: "none" },
+                { label: "GLiNER (NER)", value: "gliner" }
             ]}
             label={t('settings-slot-engine')}
             description={t('settings-slot-engine-desc')}
@@ -395,7 +404,7 @@
             bind:value={selectedSlotExtractionEngine}
         />
 
-        {#if selectedSlotExtractionEngine === "GLiNER"}
+        {#if selectedSlotExtractionEngine === "gliner"}
             <Space h="sm" />
             {#key availableGlinerModels}
             <NativeSelect
@@ -423,8 +432,8 @@
         <Space h="xl" />
         <NativeSelect
             data={[
-                { label: t('settings-disabled'), value: "None" },
-                { label: "Nnnoiseless", value: "Nnnoiseless" }
+                { label: t('settings-disabled'), value: "none" },
+                { label: "Nnnoiseless", value: "nnnoiseless" }
             ]}
             label={t('settings-noise-suppression')}
             description={t('settings-noise-suppression-desc')}
@@ -436,9 +445,9 @@
 
         <NativeSelect
             data={[
-                { label: t('settings-disabled'), value: "None" },
-                { label: "Energy", value: "Energy" },
-                { label: "Nnnoiseless", value: "Nnnoiseless" }
+                { label: t('settings-disabled'), value: "none" },
+                { label: "Energy", value: "energy" },
+                { label: "Nnnoiseless", value: "nnnoiseless" }
             ]}
             label={t('settings-vad')}
             description={t('settings-vad-desc')}

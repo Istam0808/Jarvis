@@ -1,0 +1,50 @@
+[[commands]]
+id = "calculator_open"
+type = "cli"
+cli_cmd = "calc"
+sounds.ru = ["ok1", "ok2", "ok3"]
+sounds.en = ["ok1", "ok2", "ok3"]
+sounds.ua = ["ok1", "ok2", "ok3"]
+
+phrases.ru = [
+    "включи калькулятор",
+    "открой калькулятор",
+    "покажи калькулятор",
+    "запусти калькулятор",
+    "калькулятор",
+]
+phrases.en = [
+    "open calculator",
+    "launch calculator",
+    "calculator",
+]
+phrases.ua = [
+    "відкрий калькулятор",
+    "запусти калькулятор",
+    "калькулятор",
+]
+
+
+[[commands]]
+id = "calculator_close"
+type = "cli"
+cli_cmd = "taskkill"
+cli_args = ["/f", "/im", "CalculatorApp.exe"]
+sounds.ru = ["ok1", "ok2", "ok3"]
+sounds.en = ["ok1", "ok2", "ok3"]
+sounds.ua = ["ok1", "ok2", "ok3"]
+
+phrases.ru = [
+    "закрой калькулятор",
+    "отключи калькулятор",
+    "выключи калькулятор",
+    "убери калькулятор",
+]
+phrases.en = [
+    "close calculator",
+    "quit calculator",
+]
+phrases.ua = [
+    "закрий калькулятор",
+    "вимкни калькулятор",
+]

@@ -1,17 +1,18 @@
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import sveltePreprocess from "svelte-preprocess";
 import tsconfigPaths from 'vite-tsconfig-paths'
 import routify from '@roxi/routify/vite-plugin'
 
 export default defineConfig({
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: "modern-compiler",
+      },
+    },
+  },
   plugins: [
     svelte({
-      preprocess: [
-        sveltePreprocess({
-          typescript: true,
-        }),
-      ],
       onwarn: (warning, handler) => {
         const { code, frame } = warning;
         if (code === "css-unused-selector")

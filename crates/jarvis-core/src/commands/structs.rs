@@ -103,6 +103,47 @@ impl Clone for JCommand {
 }
 
 impl JCommand {
+    /// Build a command from legacy `command.yaml` (Russian phrases/sounds only).
+    pub fn from_legacy_ru(
+        id: String,
+        cmd_type: String,
+        exe_path: String,
+        exe_args: Vec<String>,
+        cli_cmd: String,
+        cli_args: Vec<String>,
+        script: String,
+        sandbox: String,
+        timeout: u64,
+        phrases_ru: Vec<String>,
+        sounds_ru: Vec<String>,
+    ) -> Self {
+        let mut phrases = HashMap::new();
+        if !phrases_ru.is_empty() {
+            phrases.insert("ru".to_string(), phrases_ru);
+        }
+        let mut sounds = HashMap::new();
+        if !sounds_ru.is_empty() {
+            sounds.insert("ru".to_string(), sounds_ru);
+        }
+        Self {
+            id,
+            cmd_type,
+            description: String::new(),
+            exe_path,
+            exe_args,
+            cli_cmd,
+            cli_args,
+            script,
+            sandbox,
+            timeout,
+            sounds,
+            phrases,
+            slots: HashMap::new(),
+            sounds_cache: RwLock::new(HashMap::new()),
+            phrases_cache: RwLock::new(HashMap::new()),
+        }
+    }
+
     // get phrases for current language
     pub fn get_phrases(&self, lang: &str) -> Arc<Vec<String>> {
         if let Some(cached) = self.phrases_cache.read().get(lang) {

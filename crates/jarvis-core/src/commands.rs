@@ -7,6 +7,7 @@ use std::process::{Child, Command};
 use seqdiff::ratio;
 
 mod structs;
+mod yaml_legacy;
 pub use structs::*;
 
 use crate::{config, i18n, APP_DIR};
@@ -24,31 +25,58 @@ pub fn parse_commands() -> Result<Vec<JCommandsList>, String> {
     for entry in cmd_dirs.flatten() {
         let cmd_path = entry.path();
         let toml_file = cmd_path.join("command.toml");
-        
-        if !toml_file.exists() {
+        let yaml_file = cmd_path.join("command.yaml");
+
+        let pack_name = entry
+            .file_name()
+            .into_string()
+            .unwrap_or_else(|s| s.to_string_lossy().into_owned());
+
+        if toml_file.exists() {
+            let content = match fs::read_to_string(&toml_file) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!("Failed to read {}: {}", toml_file.display(), e);
+                    continue;
+                }
+            };
+
+            let file: JCommandsList = match toml::from_str(&content) {
+                Ok(f) => f,
+                Err(e) => {
+                    warn!("Failed to parse {}: {}", toml_file.display(), e);
+                    continue;
+                }
+            };
+
+            commands.push(JCommandsList {
+                path: cmd_path,
+                commands: file.commands,
+            });
             continue;
         }
-        
-        let content = match fs::read_to_string(&toml_file) {
-            Ok(c) => c,
-            Err(e) => {
-                warn!("Failed to read {}: {}", toml_file.display(), e);
-                continue;
-            }
-        };
 
-        let file: JCommandsList = match toml::from_str(&content) {
-            Ok(f) => f,
-            Err(e) => {
-                warn!("Failed to parse {}: {}", toml_file.display(), e);
-                continue;
-            }
-        };
+        if yaml_file.exists() {
+            let content = match fs::read_to_string(&yaml_file) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!("Failed to read {}: {}", yaml_file.display(), e);
+                    continue;
+                }
+            };
 
-        commands.push(JCommandsList {
-            path: cmd_path,
-            commands: file.commands,
-        });
+            match yaml_legacy::commands_from_yaml_str(&content, &pack_name) {
+                Ok(cmds) => {
+                    commands.push(JCommandsList {
+                        path: cmd_path,
+                        commands: cmds,
+                    });
+                }
+                Err(e) => {
+                    warn!("Failed to parse legacy {}: {}", yaml_file.display(), e);
+                }
+            }
+        }
     }
 
     if commands.is_empty() {
@@ -192,7 +220,14 @@ pub fn execute_cli(cmd: &str, args: &[String]) -> std::io::Result<Child> {
     }
 }
 
-pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option<&str>, slots: Option<&HashMap<String, SlotValue>>) -> Result<bool, String> {
+pub fn execute_command(
+    cmd_path: &PathBuf,
+    cmd_config: &JCommand,
+    #[cfg_attr(not(feature = "lua"), allow(unused_variables))]
+    phrase: Option<&str>,
+    #[cfg_attr(not(feature = "lua"), allow(unused_variables))]
+    slots: Option<&HashMap<String, SlotValue>>,
+) -> Result<bool, String> {
     // execute command by the type
     match cmd_config.cmd_type.as_str() {
 

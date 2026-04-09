@@ -33,8 +33,8 @@
             }
 
             wakeWordEngine = await invoke<string>("db_read", { key: "selected_wake_word_engine" }) || "Rustpotter"
-            sttEngine = await invoke<string>("db_read", { key: "selected_stt_engine" }) || "Vosk"
-            vadInfo = await invoke<string>("db_read", { key: "vad" }) || "Vosk"
+            sttEngine = await invoke<string>("db_read", { key: "speech_to_text_engine" }) || "Vosk"
+            vadInfo = await invoke<string>("db_read", { key: "vad_backend" }) || "energy"
         } catch (err) {
             console.error("Failed to load stats:", err)
             microphoneName = t('stats-not-selected')

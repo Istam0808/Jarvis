@@ -13,9 +13,14 @@
         const command = searchQuery.trim()
         if (!command || isProcessing) return
         
-        if (!$isJarvisRunning || !$ipcConnected) {
+        if (!$isJarvisRunning) {
             statusMessage = t('search-error-not-running')
-            setTimeout(() => statusMessage = "", 3000)
+            setTimeout(() => statusMessage = "", 5000)
+            return
+        }
+        if (!$ipcConnected) {
+            statusMessage = t('search-error-no-ipc')
+            setTimeout(() => statusMessage = "", 5000)
             return
         }
 

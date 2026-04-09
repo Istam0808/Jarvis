@@ -1,3 +1,5 @@
+@use "sass:color";
+
 * {
     margin: 0;
     padding: 0;
@@ -10,7 +12,7 @@ body {
     color: #ffffff;
     overflow: hidden;
 
-    background-color: darken($color: #090C10, $amount: 0.8)!important;
+    background-color: color.scale(#090C10, $lightness: -16.32%) !important;
     // background-image: url(../media/bg.png)!important;
     background-repeat: no-repeat;
     background-size: contain;

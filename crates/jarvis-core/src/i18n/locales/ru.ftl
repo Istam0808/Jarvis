@@ -139,5 +139,6 @@ settings-gliner-models-hint = Модели GLiNER не найдены.
 
 # ETC
 search-error-not-running = Ассистент не запущен
+search-error-no-ipc = Связь с ассистентом не установлена (ожидается WebSocket на порту 9712). Перезапустите фоновый Jarvis App или подождите пару секунд.
 search-error-failed = Не удалось выполнить команду
 settings-no-voices = Голоса не найдены

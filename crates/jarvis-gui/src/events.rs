@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use tauri::Emitter;
 
 // the payload type must implement `Serialize` and `Clone`.
@@ -6,7 +8,6 @@ pub struct Payload {
     pub data: String,
 }
 
-#[allow(dead_code)]
 pub enum EventTypes {
     AudioPlay,
     AssistantWaiting,

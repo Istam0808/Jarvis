@@ -89,7 +89,7 @@ impl Settings {
                 self.slots_backend = val.to_string();
             }
             "vad_backend" => {
-                self.vad_backend = val.to_string();
+                self.vad_backend = val.to_lowercase();
             }
             "selected_gliner_model" => {
                 self.gliner_model = val.to_string();
